@@ -303,8 +303,16 @@ extension BarcodeScannerViewController: CameraViewControllerDelegate {
 
   func cameraViewControllerDidTapSettingsButton(_ controller: CameraViewController) {
     DispatchQueue.main.async {
-        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(settingsURL, options: [UIApplication.OpenExternalURLOptionsKey.universalLinksOnly : true], completionHandler: nil)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+           if UIApplication.shared.canOpenURL(url) {
+            if #available(iOS 10.0, *) {
+                _ =  UIApplication.shared.open(url,
+                                               options: convertToUIApplicationOpenExternalURLOptionsKeyDictionary([:]),
+                                               completionHandler: nil)
+            } else {
+                // Fallback on earlier versions
+            }
+           }
         }
     }
   }
@@ -336,4 +344,11 @@ extension BarcodeScannerViewController: CameraViewControllerDelegate {
     codeDelegate?.scanner(self, didCaptureCode: code, type: rawType)
     animateFlash(whenProcessing: isOneTimeSearch)
   }
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+private func convertToUIApplicationOpenExternalURLOptionsKeyDictionary(_ input: [String: Any]) ->
+    [UIApplication.OpenExternalURLOptionsKey: Any] {
+	return Dictionary(uniqueKeysWithValues: input.map { key, value in
+        (UIApplication.OpenExternalURLOptionsKey(rawValue: key), value)})
 }

@@ -16,7 +16,7 @@ protocol CameraViewControllerDelegate: class {
 /// View controller responsible for camera controls and video capturing.
 public final class CameraViewController: UIViewController {
     weak var delegate: CameraViewControllerDelegate?
-    
+
     /// Focus view type.
     public var barCodeFocusViewType: FocusViewType = .animated
     public var showsCameraButton: Bool = false {
@@ -26,9 +26,9 @@ public final class CameraViewController: UIViewController {
     }
     /// `AVCaptureMetadataOutput` metadata object types.
     var metadata = [AVMetadataObject.ObjectType]()
-    
+
     // MARK: - UI proterties
-    
+
     /// Animated focus view.
     public private(set) lazy var focusView: UIView = self.makeFocusView()
     /// Button to change torch mode.
@@ -37,14 +37,14 @@ public final class CameraViewController: UIViewController {
     public private(set) lazy var settingsButton: UIButton = self.makeSettingsButton()
     // Button to switch between front and back camera.
     public private(set) lazy var cameraButton: UIButton = self.makeCameraButton()
-    
+
     // Constraints for the focus view when it gets smaller in size.
     private var regularFocusViewConstraints = [NSLayoutConstraint]()
     // Constraints for the focus view when it gets bigger in size.
     private var animatedFocusViewConstraints = [NSLayoutConstraint]()
-    
+
     // MARK: - Video
-    
+
     /// Video preview layer.
     private var videoPreviewLayer: AVCaptureVideoPreviewLayer?
     /// Video capture device. This may be nil when running in Simulator.
@@ -53,67 +53,62 @@ public final class CameraViewController: UIViewController {
     private lazy var captureSession: AVCaptureSession = AVCaptureSession()
     // Service used to check authorization status of the capture device
     private let permissionService = VideoPermissionService()
-    
+
     /// The current torch mode on the capture device.
     private var torchMode: TorchMode = .off {
         didSet {
             guard let captureDevice = captureDevice, captureDevice.hasFlash else { return }
             guard captureDevice.isTorchModeSupported(torchMode.captureTorchMode) else { return }
-            
-            do {
+                do {
                 try captureDevice.lockForConfiguration()
                 captureDevice.torchMode = torchMode.captureTorchMode
                 captureDevice.unlockForConfiguration()
             } catch {}
-            
-            flashButton.setImage(torchMode.image, for: UIControl.State())
+                flashButton.setImage(torchMode.image, for: UIControl.State())
         }
     }
-    
+
+    @available(iOS 10.0, *)
     private var frontCameraDevice: AVCaptureDevice? {
-        
         return AVCaptureDevice.default(AVCaptureDevice.DeviceType.builtInWideAngleCamera, for: .video, position: .front)
     }
-    
+
     private var backCameraDevice: AVCaptureDevice? {
         return AVCaptureDevice.default(for: .video)
     }
-    
+
     // MARK: - Initialization
-    
+
     deinit {
         stopCapturing()
         NotificationCenter.default.removeObserver(self)
     }
-    
+
     // MARK: - View lifecycle
-    
+
     public override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
         videoPreviewLayer = AVCaptureVideoPreviewLayer(session: self.captureSession)
         videoPreviewLayer?.videoGravity = .resizeAspectFill
-        
         guard let videoPreviewLayer = videoPreviewLayer else {
             return
         }
-        
         view.layer.addSublayer(videoPreviewLayer)
         view.addSubviews(settingsButton, flashButton, focusView, cameraButton)
-        
         torchMode = .off
         focusView.isHidden = true
         setupCamera()
         setupConstraints()
         setupActions()
     }
-    
+
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         setupVideoPreviewLayerOrientation()
         animateFocusView()
     }
-    
+
     public override func viewWillTransition(to size: CGSize,
                                             with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
@@ -125,35 +120,33 @@ public final class CameraViewController: UIViewController {
                 self?.animateFocusView()
             }))
     }
-    
+
     // MARK: - Video capturing
-    
+
     func startCapturing() {
         guard !isSimulatorRunning else {
             return
         }
-        
         torchMode = .off
         captureSession.startRunning()
         focusView.isHidden = false
         flashButton.isHidden = captureDevice?.position == .front
         cameraButton.isHidden = !showsCameraButton
     }
-    
+
     func stopCapturing() {
         guard !isSimulatorRunning else {
             return
         }
-        
         torchMode = .off
         captureSession.stopRunning()
         focusView.isHidden = true
         flashButton.isHidden = true
         cameraButton.isHidden = true
     }
-    
+
     // MARK: - Actions
-    
+
     private func setupActions() {
         flashButton.addTarget(
             self,
@@ -170,7 +163,6 @@ public final class CameraViewController: UIViewController {
             action: #selector(handleCameraButtonTap),
             for: .touchUpInside
         )
-        
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(appWillEnterForeground),
@@ -178,42 +170,40 @@ public final class CameraViewController: UIViewController {
             object: nil
         )
     }
-    
+
     /// `UIApplicationWillEnterForegroundNotification` action.
     @objc private func appWillEnterForeground() {
         torchMode = .off
         animateFocusView()
     }
-    
+
     /// Opens setting to allow camera usage.
     @objc private func handleSettingsButtonTap() {
         delegate?.cameraViewControllerDidTapSettingsButton(self)
     }
-    
+
     /// Swaps camera position.
     @objc private func handleCameraButtonTap() {
         swapCamera()
     }
-    
+
     /// Sets the next torch mode.
     @objc private func handleFlashButtonTap() {
         torchMode = torchMode.next
     }
-    
+
     // MARK: - Camera setup
-    
+
     /// Sets up camera and checks for camera permissions.
     private func setupCamera() {
         permissionService.checkPersmission { [weak self] error in
             guard let strongSelf = self else {
                 return
             }
-            
-            DispatchQueue.main.async { [weak self] in
+                DispatchQueue.main.async { [weak self] in
                 self?.settingsButton.isHidden = error == nil
             }
-            
-            if error == nil {
+                if error == nil {
                 strongSelf.setupSessionInput(for: .back)
                 strongSelf.setupSessionOutput()
                 strongSelf.delegate?.cameraViewControllerDidSetupCaptureSession(strongSelf)
@@ -222,17 +212,14 @@ public final class CameraViewController: UIViewController {
             }
         }
     }
-    
+
     /// Sets up capture input, output and session.
     private func setupSessionInput(for position: AVCaptureDevice.Position) {
-        guard !isSimulatorRunning else {
+        guard !isSimulatorRunning, #available(iOS 10.0, *),
+            let device = position == .front ? frontCameraDevice : backCameraDevice  else {
             return
         }
-        
-        guard let device = position == .front ? frontCameraDevice : backCameraDevice else {
-            return
-        }
-        
+
         do {
             let newInput = try AVCaptureDeviceInput(device: device)
             captureDevice = device
@@ -249,21 +236,19 @@ public final class CameraViewController: UIViewController {
             return
         }
     }
-    
+
     private func setupSessionOutput() {
         guard !isSimulatorRunning else {
             return
         }
-        
         let output = AVCaptureMetadataOutput()
         captureSession.addOutput(output)
         output.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
         output.metadataObjectTypes = metadata
         videoPreviewLayer?.session = captureSession
-        
         view.setNeedsLayout()
     }
-    
+
     /// Switch front/back camera.
     private func swapCamera() {
         guard let input = captureSession.inputs.first as? AVCaptureDeviceInput else {
@@ -271,9 +256,9 @@ public final class CameraViewController: UIViewController {
         }
         setupSessionInput(for: input.device.position == .back ? .front : .back)
     }
-    
+
     // MARK: - Animations
-    
+
     /// Performs focus view animation.
     private func animateFocusView() {
         // Restore to initial state
@@ -281,14 +266,11 @@ public final class CameraViewController: UIViewController {
         animatedFocusViewConstraints.deactivate()
         regularFocusViewConstraints.activate()
         view.layoutIfNeeded()
-        
         guard barCodeFocusViewType == .animated else {
             return
         }
-        
         regularFocusViewConstraints.deactivate()
         animatedFocusViewConstraints.activate()
-        
         UIView.animate(
             withDuration: 1.0,
             delay: 0,
@@ -327,56 +309,45 @@ private extension CameraViewController {
                 cameraButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -30)
             )
         }
-        
         let imageButtonSize: CGFloat = 37
-        
         NSLayoutConstraint.activate(
             flashButton.widthAnchor.constraint(equalToConstant: imageButtonSize),
             flashButton.heightAnchor.constraint(equalToConstant: imageButtonSize),
-            
-            settingsButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                settingsButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             settingsButton.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             settingsButton.widthAnchor.constraint(equalToConstant: 150),
             settingsButton.heightAnchor.constraint(equalToConstant: 50),
-            
-            cameraButton.widthAnchor.constraint(equalToConstant: 48),
+                cameraButton.widthAnchor.constraint(equalToConstant: 48),
             cameraButton.heightAnchor.constraint(equalToConstant: 48),
             cameraButton.trailingAnchor.constraint(equalTo: flashButton.trailingAnchor)
         )
-        
         setupFocusViewConstraints()
     }
-    
+
     func setupFocusViewConstraints() {
         NSLayoutConstraint.activate(
             focusView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             focusView.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         )
-        
         let focusViewSize = barCodeFocusViewType == .oneDimension
             ? CGSize(width: 280, height: 80)
             : CGSize(width: 218, height: 150)
-        
         regularFocusViewConstraints = [
             focusView.widthAnchor.constraint(equalToConstant: focusViewSize.width),
             focusView.heightAnchor.constraint(equalToConstant: focusViewSize.height)
         ]
-        
         animatedFocusViewConstraints = [
             focusView.widthAnchor.constraint(equalToConstant: 280),
             focusView.heightAnchor.constraint(equalToConstant: 80)
         ]
-        
         NSLayoutConstraint.activate(regularFocusViewConstraints)
     }
-    
+
     func setupVideoPreviewLayerOrientation() {
         guard let videoPreviewLayer = videoPreviewLayer else {
             return
         }
-        
         videoPreviewLayer.frame = view.layer.bounds
-        
         if let connection = videoPreviewLayer.connection, connection.isVideoOrientationSupported {
             switch UIApplication.shared.statusBarOrientation {
             case .portrait:
@@ -409,7 +380,7 @@ private extension CameraViewController {
         view.layer.masksToBounds = false
         return view
     }
-    
+
     func makeSettingsButton() -> UIButton {
         let button = UIButton(type: .system)
         let title = NSAttributedString(
@@ -420,7 +391,7 @@ private extension CameraViewController {
         button.sizeToFit()
         return button
     }
-    
+
     func makeCameraButton() -> UIButton {
         let button = UIButton(type: .custom)
         button.setImage(imageNamed("cameraRotate"), for: UIControl.State())
